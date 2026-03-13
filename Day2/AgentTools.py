@@ -1,0 +1,132 @@
+import os
+from google.genai import types
+
+from google.adk.agents import LlmAgent
+from google.adk.models.google_llm import Gemini
+from google.adk.runners import InMemoryRunner
+from google.adk.sessions import InMemorySessionService
+from google.adk.tools import google_search, AgentTool, ToolContext
+from google.adk.code_executors import BuiltInCodeExecutor
+
+print("✅ ADK components imported successfully.")
+
+# export GOOGLE_API_KEY=
+try:
+    
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+    print(f"✅ Gemini API key setup complete. {GOOGLE_API_KEY}")
+   
+except Exception as e:
+    print(
+        f"🔑 Authentication Error: Please make sure you have added 'GOOGLE_API_KEY' to your Kaggle secrets. Details: {e}"
+    )
+
+print("✅ ADK components imported successfully.")
+
+def show_python_code_and_result(response):
+    for i in range(len(response)):
+        # Check if the response contains a valid function call result from the code executor
+        if (
+            (response[i].content.parts)
+            and (response[i].content.parts[0])
+            and (response[i].content.parts[0].function_response)
+            and (response[i].content.parts[0].function_response.response)
+        ):
+            response_code = response[i].content.parts[0].function_response.response
+            if "result" in response_code and response_code["result"] != "```":
+                if "tool_code" in response_code["result"]:
+                    print(
+                        "Generated Python Code >> ",
+                        response_code["result"].replace("tool_code", ""),
+                    )
+                else:
+                    print("Generated Python Response >> ", response_code["result"])
+
+
+print("✅ Helper functions defined.")
+
+retry_config = types.HttpRetryOptions(
+    attempts=5,  # Maximum retry attempts
+    exp_base=7,  # Delay multiplier
+    initial_delay=1,
+    http_status_codes=[429, 500, 503, 504],  # Retry on these HTTP errors
+)
+
+# Pay attention to the docstring, type hints, and return value.
+def get_fee_for_payment_method(method: str) -> dict:
+    """Looks up the transaction fee percentage for a given payment method.
+
+    This tool simulates looking up a company's internal fee structure based on
+    the name of the payment method provided by the user.
+
+    Args:
+        method: The name of the payment method. It should be descriptive,
+                e.g., "platinum credit card" or "bank transfer".
+
+    Returns:
+        Dictionary with status and fee information.
+        Success: {"status": "success", "fee_percentage": 0.02}
+        Error: {"status": "error", "error_message": "Payment method not found"}
+    """
+    # This simulates looking up a company's internal fee structure.
+    fee_database = {
+        "platinum credit card": 0.02,  # 2%
+        "gold debit card": 0.035,  # 3.5%
+        "bank transfer": 0.01,  # 1%
+    }
+
+    fee = fee_database.get(method.lower())
+    if fee is not None:
+        return {"status": "success", "fee_percentage": fee}
+    else:
+        return {
+            "status": "error",
+            "error_message": f"Payment method '{method}' not found",
+        }
+
+
+print("✅ Fee lookup function created")
+print(f"💳 Test: {get_fee_for_payment_method('platinum credit card')}")
+
+def get_exchange_rate(base_currency: str, target_currency: str) -> dict:
+    """Looks up and returns the exchange rate between two currencies.
+
+    Args:
+        base_currency: The ISO 4217 currency code of the currency you
+                       are converting from (e.g., "USD").
+        target_currency: The ISO 4217 currency code of the currency you
+                         are converting to (e.g., "EUR").
+
+    Returns:
+        Dictionary with status and rate information.
+        Success: {"status": "success", "rate": 0.93}
+        Error: {"status": "error", "error_message": "Unsupported currency pair"}
+    """
+
+    # Static data simulating a live exchange rate API
+    # In production, this would call something like: requests.get("api.exchangerates.com")
+    rate_database = {
+        "usd": {
+            "eur": 0.93,  # Euro
+            "jpy": 157.50,  # Japanese Yen
+            "inr": 83.58,  # Indian Rupee
+        }
+    }
+
+    # Input validation and processing
+    base = base_currency.lower()
+    target = target_currency.lower()
+
+    # Return structured result with status
+    rate = rate_database.get(base, {}).get(target)
+    if rate is not None:
+        return {"status": "success", "rate": rate}
+    else:
+        return {
+            "status": "error",
+            "error_message": f"Unsupported currency pair: {base_currency}/{target_currency}",
+        }
+
+
+print("✅ Exchange rate function created")
+print(f"💱 Test: {get_exchange_rate('USD', 'EUR')}")
