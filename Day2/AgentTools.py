@@ -1,3 +1,4 @@
+import asyncio
 import os
 from google.genai import types
 
@@ -130,3 +131,38 @@ def get_exchange_rate(base_currency: str, target_currency: str) -> dict:
 
 print("✅ Exchange rate function created")
 print(f"💱 Test: {get_exchange_rate('USD', 'EUR')}")
+
+# Currency agent with custom function tools
+currency_agent = LlmAgent(
+    name="currency_agent",
+    model=Gemini(model="gemini-2.5-flash-lite", retry_options=retry_config),
+    instruction="""You are a smart currency conversion assistant.
+
+    For currency conversion requests:
+    1. Use `get_fee_for_payment_method()` to find transaction fees
+    2. Use `get_exchange_rate()` to get currency conversion rates
+    3. Check the "status" field in each tool's response for errors
+    4. Calculate the final amount after fees based on the output from `get_fee_for_payment_method` and `get_exchange_rate` methods and provide a clear breakdown.
+    5. First, state the final converted amount.
+        Then, explain how you got that result by showing the intermediate amounts. Your explanation must include: the fee percentage and its
+        value in the original currency, the amount remaining after the fee, and the exchange rate used for the final conversion.
+
+    If any tool returns status "error", explain the issue to the user clearly.
+    """,
+    tools=[get_fee_for_payment_method, get_exchange_rate],
+)
+
+print("✅ Currency agent created with custom function tools")
+print("🔧 Available tools:")
+print("  • get_fee_for_payment_method - Looks up company fee structure")
+print("  • get_exchange_rate - Gets current exchange rates")
+
+# Test the currency agent
+currency_runner = InMemoryRunner(agent=currency_agent)
+
+async def main():
+    response = await currency_runner.run_debug(
+    "I want to convert 500 US Dollars to Euros using my Platinum Credit Card. How much will I receive?"
+)
+
+asyncio.run(main())
